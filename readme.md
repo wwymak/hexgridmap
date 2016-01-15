@@ -1,0 +1,2 @@
+My attempt to make a hexgridmap for the uk as per https://medium.com/@kristw/creating-grid-map-for-thailand-397b53a4ecf#.3ufnxrmvd
+and https://github.com/kristw/gridmap-layout-thailand and http://bl.ocks.org/mbostock/5249328
