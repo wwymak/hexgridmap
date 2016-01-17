@@ -7,5 +7,12 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "d3": "^3.5.12",
+    "topojson": "^1.6.20"
+  },
+  "devDependencies": {
+    "webpack": "^1.12.11"
+  }
 }

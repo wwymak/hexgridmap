@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
+    <script src="http://d3js.org/topojson.v1.min.js"></script>
+</head>
+<body>
+
+<script>
+
+    var width = 960,
+            height = 1160;
+
+    var svg = d3.select("body").append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+    var geodata
+
+    var projection = d3.geo.mercator().scale(1000)
+
+    function resetProjection(json){
+        var center = d3.geo.centroid(json)
+        var scale  = 150;
+        var offset = [width/2, height/2];
+        var projection = d3.geo.mercator().scale(scale).center(center)
+                .translate(offset);
+
+        // create the path
+        var path = d3.geo.path().projection(projection);
+
+        // using the path determine the bounds of the current map and use
+        // these to determine better values for the scale and translation
+        var bounds  = path.bounds(json);
+        var hscale  = scale*width  / (bounds[1][0] - bounds[0][0]);
+        var vscale  = scale*height / (bounds[1][1] - bounds[0][1]);
+        scale   = (hscale < vscale) ? hscale : vscale;
+        offset  = [width - (bounds[0][0] + bounds[1][0])/2,
+            height - (bounds[0][1] + bounds[1][1])/2];
+
+        // new projection
+        projection = d3.geo.mercator().center(center)
+                .scale(scale).translate(offset);
+        path = path.projection(projection);
+
+        return {
+            projection: projection,
+            path: path
+        }
+    }
+
+
+    d3.json("../data/uk_counties.topo.json", function(err, data){
+        geodata = topojson.feature(data, data.objects.uk_counties)
+
+        var center = d3.geo.centroid(geodata)
+        projection.center(center)
+
+        projection = resetProjection(geodata).projection
+
+        svg.selectAll("path")
+            .data(geodata.features)
+                .enter().append("path")
+            .attr("d", d3.geo.path().projection(projection)).attr("stroke", "black").style("fill", "none");
+    })
+
+
+
+</script>
+
+</body>
+</html>
