@@ -132,7 +132,9 @@
                 cx: centroid[0],
                 cy: centroid[1],
                 clusterX: centroid[0],
-                clusterY: centroid[1]
+                clusterY: centroid[1],
+//                x: centroid[0],
+//                y: centroid[1],
             }
         });
 
@@ -176,8 +178,10 @@ console.log('end')
 //            console.log(hexblocks)
 //            hexblocks.forEach(function(d){d.cx = d.x;
 //                d.cy = d.y})
-//            hexblocks.forEach(gravity(0.2 * e.alpha))
-//            hexblocks.forEach(collide(.5))
+            hexblocks.forEach(gravity(0.2 * e.alpha))
+            hexblocks.forEach(collide(.5))
+//            hexblocks.forEach(function(d){d.cx = d.x;
+//                d.cy = d.y})
 //            node.attr('r', 10)
 //                    .attr('cx', function(d) { return d.x; })
 //                    .attr('cy', function(d) { return d.y; });
@@ -202,7 +206,7 @@ console.log('end')
                         var x = d.x - quad.point.x,
                                 y = d.y - quad.point.y,
                                 l = Math.sqrt(x * x + y * y),
-                                r = 10//d.radius + quad.point.radius + (d.color !== quad.point.color) * padding;
+                                r = 20 //d.radius + quad.point.radius + (d.color !== quad.point.color) * padding;
                         if (l < r) {
                             l = (l - r) / l * alpha;
                             d.x -= x *= l;
@@ -226,6 +230,8 @@ console.log('end')
                 .attr('cy', function(d) { return d.cy; });
 
         force.start();
+
+        node.call(force.drag);
 
     })
 
