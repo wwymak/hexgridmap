@@ -13,7 +13,11 @@ var geodata = topojson.feature(topojsonData, topojsonData.objects.uk_counties)
 var projection = resetProjection(geodata);
 var path = d3.geo.path().projection(projection);
 
-
+/**
+ * this basically rescales the projection params to make the geojson fit on the viewport
+ * @param geojson
+ * @returns {*} d3 projection
+ */
 function resetProjection(geojson){
     var center = d3.geo.centroid(geojson)
     var scale  = 150;

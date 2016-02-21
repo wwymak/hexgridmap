@@ -4,13 +4,21 @@
     <meta charset="UTF-8">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
     <script src="http://d3js.org/topojson.v1.min.js"></script>
+
+    <style>
+        .node {
+        fill: #ccc;
+        stroke: #fff;
+        stroke-width: 2px;
+    }
+    </style>
 </head>
 <body>
 
 <script>
 
     var width = 960,
-            height = 1160;
+        height = 1160;
 
     var svg = d3.select("body").append("svg")
             .attr("width", width)
@@ -18,7 +26,8 @@
 
     var geodata
 
-    var projection = d3.geo.mercator().scale(1000)
+    var projection = d3.geo.mercator().scale(1000);
+
 
     function resetProjection(json){
         var center = d3.geo.centroid(json)
@@ -51,18 +60,173 @@
     }
 
 
+
+    //moving nodes towards the cluster center
+    function gravity(alpha){
+        return function(d) {
+            d.cy += (d.clusterY - d.cy) * alpha;
+            d.cx += (d.clusterX - d.cx) * alpha;
+        };
+    }
+
+
+
+
+    function collide(alpha){
+        var quadtree = d3.geom.quadtree(hexblocks)
+                .x(function(d){return d.cx;})
+                .y(function(d){return d.cy;})
+
+        var r = node.radius + 16,
+                nx1 = node.x - r,
+                nx2 = node.x + r,
+                ny1 = node.y - r,
+                ny2 = node.y + r;
+        return function(quad, x1, y1, x2, y2) {
+            if (quad.point && (quad.point !== node)) {
+                var x = node.x - quad.point.x,
+                        y = node.y - quad.point.y,
+                        l = Math.sqrt(x * x + y * y),
+                        r = node.radius + quad.point.radius;
+                if (l < r) {
+                    l = (l - r) / l * .5;
+                    node.x -= x *= l;
+                    node.y -= y *= l;
+                    quad.point.x += x;
+                    quad.point.y += y;
+                }
+            }
+            return x1 > nx2 || x2 < nx1 || y1 > ny2 || y2 < ny1;
+        };
+    }
+
+
+
+
+
+
+
     d3.json("../data/uk_counties.topo.json", function(err, data){
         geodata = topojson.feature(data, data.objects.uk_counties)
 
         var center = d3.geo.centroid(geodata)
         projection.center(center)
 
-        projection = resetProjection(geodata).projection
+        projection = resetProjection(geodata).projection;
+        var path = d3.geo.path().projection(projection);
 
-        svg.selectAll("path")
+        var mapG = svg.append('g').attr('class', 'mapG');
+        var nodeG = svg.append('g').attr('class', 'nodeG');
+
+        mapG.selectAll("path")
             .data(geodata.features)
                 .enter().append("path")
             .attr("d", d3.geo.path().projection(projection)).attr("stroke", "black").style("fill", "none");
+
+        var features = geodata.features;
+
+        var hexblocks = features.map(function(d){
+            var centroid = path.centroid(d);
+            return {
+                name: d.properties.NAME,
+                cx: centroid[0],
+                cy: centroid[1],
+                clusterX: centroid[0],
+                clusterY: centroid[1]
+            }
+        });
+
+        //force layout with the centroids as the nodes,
+        //the size and width of the svg
+        var force = d3.layout.force()
+                .nodes(hexblocks)
+                .size([width, height])
+                .gravity(0)
+                .charge(0) //instead of the default 30
+                .on('tick', tick)
+//                .on('end', onEnd);
+
+        force.on('end', function() {
+//            hexblocks.forEach(function(d){d.cx = d.x;
+//                d.cy = d.y})
+//            node.attr('r', 10)
+//                .attr('cx', function(d) {return d.cx; })
+//                .attr('cy', function(d) { return d.cy; });
+console.log('end')
+
+
+        });
+
+        // Move nodes toward cluster focus.
+        //basically the force layout changes cy as it tries to move the
+        //circles apart, but you are pulling them back towards their centroids with th
+        //+= (d.clusterY - d.cy)  * alpha
+        //the higher the alpah, the more strongly pulled it is
+        function gravity(alpha) {
+            return function(d) {
+//                d.cy += (d.clusterY - d.cy) * alpha;
+//                d.cx += (d.clusterX - d.cx) * alpha;
+
+                d.y += (d.cy - d.y) * alpha;
+                d.x += (d.cx - d.x) * alpha;
+            };
+        }
+
+        function tick(e) {
+//            console.log(hexblocks)
+//            hexblocks.forEach(function(d){d.cx = d.x;
+//                d.cy = d.y})
+//            hexblocks.forEach(gravity(0.2 * e.alpha))
+//            hexblocks.forEach(collide(.5))
+//            node.attr('r', 10)
+//                    .attr('cx', function(d) { return d.x; })
+//                    .attr('cy', function(d) { return d.y; });
+
+            node.each(gravity(.2 * e.alpha))
+                    .each(collide(.5))
+                    .attr("cx", function(d) { return d.x; })
+                    .attr("cy", function(d) { return d.y; });
+        }
+
+        // Resolve collisions between nodes.
+        function collide(alpha) {
+            var quadtree = d3.geom.quadtree(hexblocks);
+            return function(d) {
+                var r = 10,//d.radius + maxRadius + padding,
+                        nx1 = d.x - r,
+                        nx2 = d.x + r,
+                        ny1 = d.y - r,
+                        ny2 = d.y + r;
+                quadtree.visit(function(quad, x1, y1, x2, y2) {
+                    if (quad.point && (quad.point !== d)) {
+                        var x = d.x - quad.point.x,
+                                y = d.y - quad.point.y,
+                                l = Math.sqrt(x * x + y * y),
+                                r = 10//d.radius + quad.point.radius + (d.color !== quad.point.color) * padding;
+                        if (l < r) {
+                            l = (l - r) / l * alpha;
+                            d.x -= x *= l;
+                            d.y -= y *= l;
+                            quad.point.x += x;
+                            quad.point.y += y;
+                        }
+                    }
+                    return x1 > nx2 || x2 < nx1 || y1 > ny2 || y2 < ny1;
+                });
+            };
+        }
+
+
+        var node = nodeG.selectAll('.node')
+                .data(hexblocks)
+                .enter().append('circle')
+                .attr('class', 'node');
+        node.attr('r', 10)
+                .attr('cx', function(d) { return d.cx; })
+                .attr('cy', function(d) { return d.cy; });
+
+        force.start();
+
     })
 
 
