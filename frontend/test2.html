@@ -1,34 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
-    <script src="http://d3js.org/topojson.v1.min.js"></script>
-
-    <style>
-        .node {
-        fill: #ccc;
-        stroke: #fff;
-        stroke-width: 2px;
-    }
-    </style>
-</head>
+<meta charset="utf-8">
 <body>
-
+<script src="//d3js.org/d3.v3.min.js"></script>
+<script src="http://d3js.org/topojson.v1.min.js"></script>
 <script>
 
     var width = 960,
         height = 1160,
-        padding = 6, // separation between nodes
+        padding = 5, // separation between same-color nodes
         maxRadius = 20;
+
+    var projection = d3.geo.mercator().scale(1000);
 
     var svg = d3.select("body").append("svg")
             .attr("width", width)
             .attr("height", height);
-
-    var geodata;
-
-    var projection = d3.geo.mercator().scale(1000);
 
 
     function resetProjection(json){
@@ -60,13 +46,11 @@
             path: path
         }
     }
-
-
     d3.json("../data/uk_counties.topo.json", function(err, data){
-        geodata = topojson.feature(data, data.objects.uk_counties)
+        var geodata = topojson.feature(data, data.objects.uk_counties)
 
-        var center = d3.geo.centroid(geodata)
-        projection.center(center)
+        var center = d3.geo.centroid(geodata);
+        projection.center(center);
 
         projection = resetProjection(geodata).projection;
         var path = d3.geo.path().projection(projection);
@@ -75,73 +59,58 @@
         var nodeG = svg.append('g').attr('class', 'nodeG');
 
         mapG.selectAll("path")
-            .data(geodata.features)
+                .data(geodata.features)
                 .enter().append("path")
-            .attr("d", d3.geo.path().projection(projection)).attr("stroke", "black").style("fill", "none");
+                .attr("d", d3.geo.path().projection(projection)).attr("stroke", "black").style("fill", "none");
 
         var features = geodata.features;
 
-        var hexblocks = features.map(function(d){
+        var nodes = features.map(function(d){
             var centroid = path.centroid(d);
             return {
                 name: d.properties.NAME,
-                cx: centroid[0],
-                cy: centroid[1],
                 x: centroid[0],
                 y: centroid[1],
                 radius: maxRadius,
+                cx: centroid[0],
+                cy: centroid[1],
             }
         });
 
-
-        //force layout with the centroids as the nodes,
-        //the size and width of the svg
         var force = d3.layout.force()
-                .nodes(hexblocks)
+                .nodes(nodes)
                 .size([width, height])
-                .gravity(0)
-                .charge(0) //instead of the default 30
-                .on('tick', tick)
+                .gravity(.02)
+                .charge(0)
+                .on("tick", tick)
                 .start();
 
-        force.on('end', function() {
-            console.log(hexblocks[0])
-//            hexblocks.forEach(function(d){d.cx = d.x;
-//                d.cy = d.y})
-//            node.attr('r', maxRadius)
-//                .attr('cx', function(d) {return d.x; })
-//                .attr('cy', function(d) { return d.y; });
-console.log('end')
+        var node = nodeG.selectAll("circle")
+                .data(nodes)
+                .enter().append("circle")
+                .style("fill", "grey")
+                .attr('r', function(d){return d.radius});
 
+        function tick(e) {
+            node
+                .each(cluster(10 * e.alpha * e.alpha))
+                .each(collide(.5))
+                .attr("cx", function(d) { return d.x; })
+                .attr("cy", function(d) { return d.y; });
+        }
 
-        });
-
-        // Move nodes toward cluster focus.
-        //basically the force layout changes cy as it tries to move the
-        //circles apart, but you are pulling them back towards their centroids with th
-        //+= (d.clusterY - d.cy)  * alpha
-        //the higher the alpah, the more strongly pulled it is
-        // Move nodes toward cluster focus.
-        function gravity(alpha) {
+        function cluster(alpha) {
             return function(d) {
                 d.y += (d.cy - d.y) * alpha;
                 d.x += (d.cx - d.x) * alpha;
             };
         }
 
-        function tick(e) {
-
-            node.each(gravity(.2 * e.alpha))
-                    .each(collide(.5))
-                    .attr("cx", function(d) { return d.x; })
-                    .attr("cy", function(d) { return d.y; });
-        }
-
-        // Resolve collisions between nodes.
+        // Resolves collisions between d and all other circles.
         function collide(alpha) {
-            var quadtree = d3.geom.quadtree(hexblocks);
+            var quadtree = d3.geom.quadtree(nodes);
             return function(d) {
-                var r = 2 * maxRadius + padding,
+                var r = d.radius + maxRadius + padding,
                         nx1 = d.x - r,
                         nx2 = d.x + r,
                         ny1 = d.y - r,
@@ -151,7 +120,7 @@ console.log('end')
                         var x = d.x - quad.point.x,
                                 y = d.y - quad.point.y,
                                 l = Math.sqrt(x * x + y * y),
-                                r = maxRadius + quad.point.radius + padding;
+                                r = d.radius + quad.point.radius + padding;
                         if (l < r) {
                             l = (l - r) / l * alpha;
                             d.x -= x *= l;
@@ -165,15 +134,6 @@ console.log('end')
             };
         }
 
-        var node = nodeG.selectAll('.node')
-                .data(hexblocks)
-                .enter().append('circle')
-                .attr('class', 'node');
-        node.attr('r', maxRadius).attr('fill', 'grey')
+    });
 
-    })
-
-</script>
-
-</body>
-</html>
+    </script>
