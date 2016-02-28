@@ -7,10 +7,20 @@
 
     <style>
         .node {
-        fill: #ccc;
-        stroke: #fff;
-        stroke-width: 2px;
-    }
+            fill: #ccc;
+            stroke: #fff;
+            stroke-width: 2px;
+        }
+
+        .hexagon {
+            fill: white;
+            pointer-events: all;
+        }
+
+        .hexagon path {
+            -webkit-transition: fill 250ms linear;
+            transition: fill 250ms linear;
+        }
     </style>
 </head>
 <body>
@@ -29,6 +39,10 @@
     var geodata;
 
     var projection = d3.geo.mercator().scale(1000);
+
+    var hexTopo = hexTopology(maxRadius, width, height),
+        hexProj = hexProjection(maxRadius),
+        hexpath = d3.geo.path().projection(hexProj);
 
 
     function resetProjection(json){
@@ -61,6 +75,56 @@
         }
     }
 
+    function hexProjection(radius) {
+        var dx = radius * 2 * Math.sin(Math.PI / 3),
+                dy = radius * 1.5;
+        return {
+            stream: function(stream) {
+                return {
+                    point: function(x, y) { stream.point(x * dx / 2, (y - (2 - (y & 1)) / 3) * dy / 2); },
+                    lineStart: function() { stream.lineStart(); },
+                    lineEnd: function() { stream.lineEnd(); },
+                    polygonStart: function() { stream.polygonStart(); },
+                    polygonEnd: function() { stream.polygonEnd(); }
+                };
+            }
+        };
+    }
+
+    function hexTopology(radius, width, height) {
+        var dx = radius * 2 * Math.sin(Math.PI / 3),
+                dy = radius * 1.5,
+                m = Math.ceil((height + radius) / dy) + 1,
+                n = Math.ceil(width / dx) + 1,
+                geometries = [],
+                arcs = [];
+
+        for (var j = -1; j <= m; ++j) {
+            for (var i = -1; i <= n; ++i) {
+                var y = j * 2, x = (i + (j & 1) / 2) * 2;
+                arcs.push([[x, y - 1], [1, 1]], [[x + 1, y], [0, 1]], [[x + 1, y + 1], [-1, 1]]);
+            }
+        }
+
+        for (var j = 0, q = 3; j < m; ++j, q += 6) {
+            for (var i = 0; i < n; ++i, q += 3) {
+                geometries.push({
+                    type: "Polygon",
+                    arcs: [[q, q + 1, q + 2, ~(q + (n + 2 - (j & 1)) * 3), ~(q - 2), ~(q - (n + 2 + (j & 1)) * 3 + 2)]],
+                    fill: Math.random() > i / n * 2
+                });
+            }
+        }
+
+
+
+        return {
+            transform: {translate: [0, 0], scale: [1, 1]},
+            objects: {hexagons: {type: "GeometryCollection", geometries: geometries}},
+            arcs: arcs
+        };
+    }
+
 
     d3.json("../data/uk_counties.topo.json", function(err, data){
         geodata = topojson.feature(data, data.objects.uk_counties)
@@ -73,11 +137,19 @@
 
         var mapG = svg.append('g').attr('class', 'mapG');
         var nodeG = svg.append('g').attr('class', 'nodeG');
+        var hexGridG = svg.append('g').attr('class', 'hexagon');
 
         mapG.selectAll("path")
             .data(geodata.features)
                 .enter().append("path")
             .attr("d", d3.geo.path().projection(projection)).attr("stroke", "black").style("fill", "none");
+
+        hexGridG.selectAll('path').data(hexTopo.objects.hexagons.geometries)
+                .enter().append('path').attr('d', function(d) {return hexpath(topojson.feature(hexTopo, d))})
+                .attr('fill', 'none').attr('stroke', 'purple');
+
+        var hexCentroids = hexTopo.objects.hexagons.geometries.map(function(d){return hexpath.centroid(topojson.feature(hexTopo, d))});
+        console.log(hexCentroids)
 
         var features = geodata.features;
 
