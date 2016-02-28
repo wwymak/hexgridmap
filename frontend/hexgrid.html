@@ -26,7 +26,7 @@
         ncols = Math.ceil((width - 0.5 * Math.sqrt(3) * hexRadius)/ (Math.sqrt(3) * hexRadius));
 
     //finding the centroids of the hexcells
-    function hexCentroids(nrows, ncols) {
+    function hexCentroids(nrows, ncols, hexRadius) {
         var centroidMatrix = []; //array of arrays
         for (var i = 0; i< nrows; i++){
             var rowArr = [];
@@ -67,6 +67,36 @@
 
         return [xIndex, yIndex]
     }
+
+    function hexagon(radius) {
+        var x0 = 0, y0 = 0;
+        var d3_hexbinAngles = d3.range(0, 2 * Math.PI, Math.PI / 3);
+        return d3_hexbinAngles.map(function(angle) {
+            var x1 = Math.sin(angle) * radius,
+                    y1 = -Math.cos(angle) * radius,
+                    dx = x1 - x0,
+                    dy = y1 - y0;
+            x0 = x1;
+            y0 = y1;
+            return [dx, dy];
+        });
+    }
+
+    function hexagonPath(radius) {
+        return "m" + hexagon(radius).join("l") + "z";
+    }
+
+    function drawHexGrid(nrows, ncols, hexRadius, svg) {
+        var centroid = hexCentroids(nrows, ncols, hexRadius);
+        var hexrows = svg.selectAll('g.hexrow').data(centroid)
+                .enter().append('g').attr('class', 'hexrow');
+
+        hexrows.selectAll('path.hexagons').data(function(d){return d})
+                .enter().append('path')
+                .attr("d", function (d) { return "M" + d[0]+ "," + d[1] + hexagonPath(hexRadius); })
+                .attr('fill', 'none').attr('stroke', 'black')
+    }
+
 
 </script>
 
