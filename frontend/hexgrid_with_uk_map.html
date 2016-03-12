@@ -7,6 +7,7 @@
     <script src="http://d3js.org/topojson.v1.min.js"></script>
 </head>
 <body>
+<button id="exportDataBtn">Export</button>
 <script>
     var width = 960,
             height = 1160,
@@ -98,7 +99,8 @@
                 .enter().append('path')
                 .attr('class', 'hexagon')
                 .attr("d", function (d) { return "M" + d[0]+ "," + d[1] + hexagonPath(hexRadius); })
-                .attr('fill', 'none').attr('stroke', 'black')
+                .attr('fill', 'rgba(255,255,255,0)').attr('stroke', 'black')
+
 
 
     }
@@ -167,7 +169,9 @@
             }
         });
 
-
+        //set to true when curating the hexagon layouts
+        var isHexBlockmoving = false;
+        var hexBlockMovingID = null;
         //force layout with the centroids as the nodes,
         //the size and width of the svg
         var force = d3.layout.force()
@@ -179,22 +183,26 @@
                 .start();
 
         force.on('end', function() {
-            console.log(hexblocks[0], 'end');
             var hexG = d3.selectAll('g.hexrow');
-            console.log(hexG[25])
             hexblocks.forEach(function(hex) {
-                var closest = getClosestCentroidIndex(hex.x, hex.y)
-                console.log(closest)
+                var closest = getClosestCentroidIndex(hex.x, hex.y);
+                hex.newX = closest[0];
+                hex.newY = closest[1];
                 hexG.filter(function(d, i){
                     return i === closest[1]
                 }).selectAll('path').filter(function(d, i){
                     return i === closest[0]
-                }).attr('fill', 'blue');
+                }).attr('fill', 'blue').attr('id', hex.name)
+//                .on('mouseover', function(d, i){
+//                    console.log(d3.select(this).attr('id'))
+//                })
+
 //                console.log(hexG[closest[1]])
 //                hexG[closest[1]].selectAll('path')[closest[0]].attr('fill', 'blue');
-            })
-
-            nodeG.selectAll('circle').attr('opacity', 0.1)
+            });
+            d3.selectAll('.hexagon').on('click', moveHexBlock)
+//            nodeG.selectAll('circle').attr('opacity', 0.1)
+            d3.selectAll('.nodeG').remove()
         });
 
         // Move nodes toward cluster focus.
@@ -246,11 +254,43 @@
             };
         }
 
+        function moveHexBlock(d, i) {
+            console.log('move this block!', d3.select(this).attr('id'))
+            var hexID = d3.select(this).attr('id');
+            if(hexID && hexID != null && isHexBlockmoving == false) {
+                //so step 1
+                isHexBlockmoving = true;
+                hexBlockMovingID = hexID;
+
+                d3.select(this).attr('id', 'moving') //set the current element id to be 'moving'
+                        .attr('fill', 'rgba(0,0,255,0.5)'); // and set the moving fill to be
+            }
+
+            if((hexID == null ||!hexID) && isHexBlockmoving === true) {
+                d3.select(this).attr('id', hexBlockMovingID)
+                        .attr('fill', 'blue')
+
+                isHexBlockmoving = false;
+                d3.select('#moving').attr('id', null).attr('fill', 'rgba(255,255,255,0)');
+                var hexBlockEl = hexblocks.filter(function(item) {
+                    return item.name === hexBlockMovingID;
+                });
+
+                hexBlockEl.newX = d[0];
+                hexBlockEl.newY = d[1];
+            }
+        }
+
         var node = nodeG.selectAll('.node')
                 .data(hexblocks)
                 .enter().append('circle')
                 .attr('class', 'node');
         node.attr('r', maxRadius).attr('fill', 'grey')
+
+        d3.select('#exportDataBtn').on('click', function() {
+            var data = JSON.stringify(hexblocks);
+            console.log(data)
+        })
 
     })
 </script>
